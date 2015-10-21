@@ -69,18 +69,7 @@ public class JdbcDemo01 {
                        }
                    });
           final  List<ClinicalAttribute> clinAttrList = Lists.newArrayList();
-  /*
-           db.select("select display_name from clinical_attribute")
-                   .getAs(String.class)
-                   .subscribe(new Action1<String>() {
-                       @Override
-                       public void call(String s) {
-                           logger.info("select clinical attribute display name: "+s);
-                           clinAttrList.add(new ClinicalAttribute(s));
-                       }
-                   });
-           logger.info("There are " +clinAttrList.size() +" clinical attributes");
-           */
+
 
            final CountDownLatch latch = new CountDownLatch(2);
            Observable<Object>obs = getClinicalAttribtues(provider.get());

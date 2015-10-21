@@ -27,9 +27,9 @@ import java.sql.SQLException;
 public class ConnectionExample {
     public static void main(String[] args) {
         String jdbcClassName="com.ibm.db2.jcc.DB2Driver";
-        String url="jdbc:db2://tidvudb1.mskcc.org:51009/DVDDB03";
-        String user="DVCBDAPS";
-        String password="rye678bob";
+        String url="jdbc:db2://tidvudb1.mskcc.org:51009/xxxx";
+        String user="xxxxx";
+        String password="xxxxx";
 
         Connection connection = null;
         try {
