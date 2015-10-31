@@ -19,6 +19,7 @@ package org.mskcc.cbio.rxjava.jdbc;
         import org.mskcc.cbio.rxjava.jdbc.model.Cbio;
         import rx.*;
         import rx.functions.Action0;
+        import rx.functions.Action1;
         import rx.schedulers.Schedulers;
 
 public class DataServices {
@@ -26,6 +27,8 @@ public class DataServices {
     private static final Logger logger = Logger.getLogger(DataServices.class);
     private static final Splitter commaSplitter = Splitter.on(',');
     private static final Joiner commaJoiner = Joiner.on(",");
+
+
     public static List<Cbio.CancerStudy> getCancerStudyList() {
         try (Connection c = ConnectionService.INSTANCE.getCbioConnection().get()) {
             ResultSet rs = c.createStatement().executeQuery("select * from cgds_gdac.cancer_study");
@@ -65,31 +68,34 @@ public class DataServices {
     }
 
 
-    public  static Observable<Object> getGeneticAlterationObs(Integer geneticProfileId, @Nullable Set<Long> entrezIdSet) {
-        Connection c = ConnectionService.INSTANCE.getCbioConnection().get();
-         String queryString = "SELECT * FROM genetic_alteration WHERE "
+    public static Observable<Cbio.GeneticAlteration> getGeneticAltObs (Integer geneticProfileId, @Nullable Set<Long> entrezIdSet){
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        String queryString = "SELECT * FROM genetic_alteration WHERE "
                 + " GENETIC_PROFILE_ID = " + geneticProfileId;
         if( entrezIdSet != null && entrezIdSet.size()>0 ) {
             queryString = queryString + " AND ENTREZ_GENE_ID IN ("
                     + commaJoiner.join(entrezIdSet) + ")";
         }
-
         final String query = queryString;
-        return Observable.create(o -> {
-            try (ResultSet rs = c.createStatement().executeQuery( query)) {
-                while (rs.next()) {
+        return Observable.<Cbio.GeneticAlteration> create (o ->{
+            try (Connection c = ConnectionService.INSTANCE.getCbioConnection().get()){
+                ResultSet rs = c.createStatement().executeQuery( query);
+                while (rs.next() && !o.isUnsubscribed()) {
                     o.onNext(Cbio.GeneticAlteration.create(rs.getInt("GENETIC_PROFILE_ID"), rs.getInt("ENTREZ_GENE_ID"),
-                           commaSplitter.splitToList(rs.getString("VALUES"))));
+                            commaSplitter.splitToList(rs.getString("VALUES"))));
                 }
                 logger.info("Query completed");
-
-            } catch (Exception e) {
-                logger.error(e.getMessage());
+                rs.close();
+                o.onCompleted();
+            } catch (Exception e){
                 o.onError(e);
             }
-           // o.onCompleted();
-        }).subscribeOn(Schedulers.immediate()).take(500).onBackpressureBuffer();
+                }
+
+        ).subscribeOn(Schedulers.io()).take(1000);
     }
+
+
 
     public static void main(String...args) {
         final CountDownLatch latch = new CountDownLatch(1);
@@ -101,9 +107,34 @@ public class DataServices {
         geneSet.add(118424L);
         ExecutorService executor = Executors.newFixedThreadPool(10);
        //Observable<Object> geneticAltObs = DataServices.getGeneticAlterationObs(2,geneSet);
-         Observable<Object> geneticAltObs = DataServices.getGeneticAlterationObs(2,null);
+         Observable<Cbio.GeneticAlteration> geneticAltObs = DataServices.getGeneticAltObs(2,null);
         final Stopwatch subWatch = Stopwatch.createUnstarted();
-        geneticAltObs.subscribe(new Subscriber<Object>() {
+
+        geneticAltObs.doOnNext(new Action1<Cbio.GeneticAlteration>() {
+            @Override
+            public void call(Cbio.GeneticAlteration geneticAlteration) {
+                Scheduler.Worker worker = Schedulers.from(executor).createWorker();
+                final Subscription schedule = worker.schedule(new Action0() {
+                    @Override
+                    public void call() {
+                        //logger.info(Thread.currentThread().getName()); // display what thread this is running on
+                        logger.info(geneticAlteration.toString());
+                        try {
+                            // complete a compute intensive task here
+                            Thread.sleep(100L);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+
+                });
+            }
+        });
+
+
+        /*
+        geneticAltObs.subscribe(new Subscriber<Cbio.GeneticAlteration>() {
             @Override
             public void onStart(){
                 subWatch.start();
@@ -128,30 +159,41 @@ public class DataServices {
             }
 
             @Override
-            public void onNext(Object o) {
+            public void onNext(Cbio.GeneticAlteration o) {
+                logger.info(Thread.currentThread().getName()); // display what thread this is running on
+                logger.info(o.toString());
+                try {
+                    // complete a compute intensive task here
+                    Thread.sleep(200L);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+
+             public void onNext(Cbio.GeneticAlteration o) {
                 Scheduler.Worker worker = Schedulers.from(executor).createWorker();
                 final Subscription schedule = worker.schedule(new Action0() {
                     @Override
                     public void call() {
-                        logger.info(Thread.currentThread().getName()); // display what thread this is running on
+                        //logger.info(Thread.currentThread().getName()); // display what thread this is running on
                         logger.info(o.toString());
                         try {
                             // complete a compute intensive task here
-                            Thread.sleep(500L);
+                            Thread.sleep(100L);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
 
-                        //request(100L);
                     }
 
                 });
 
             }
+
         });
-
-
-
+            */
         try {
             latch.await();
             logger.info("FINIS....");
