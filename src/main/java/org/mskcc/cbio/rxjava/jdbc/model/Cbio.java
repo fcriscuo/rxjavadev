@@ -3,6 +3,9 @@ package org.mskcc.cbio.rxjava.jdbc.model;
 import com.google.auto.value.AutoValue;
 import com.sun.istack.internal.Nullable;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * Copyright (c) 2015 Memorial Sloan-Kettering Cancer Center.
  * <p>
@@ -24,6 +27,18 @@ import com.sun.istack.internal.Nullable;
  * criscuof@mskcc.org
  */
 public class Cbio {
+
+    @AutoValue
+    public abstract static class GeneticAlteration{
+        GeneticAlteration() {}
+        public static GeneticAlteration create (Integer profileId, Integer entrezId, List<String> valueList) {
+            return new AutoValue_Cbio_GeneticAlteration(profileId, entrezId, valueList);
+        }
+        abstract Integer profileId();
+        abstract Integer entrezId();
+        abstract List<String> valueList();
+
+    }
     @AutoValue
     public  abstract static class CancerStudy {
         CancerStudy() {}
@@ -38,8 +53,13 @@ public class Cbio {
         abstract String description();
 
     }
+
+
     public static void main (String...args){
         CancerStudy study = CancerStudy.create("identifier1", "lymph", "Cancer Study 1", "study1","A cancer study");
         System.out.println(study.toString());
+        GeneticAlteration ga = GeneticAlteration.create(1,1000, Arrays.asList("1","0","-1"));
+        System.out.println(ga.toString());
     }
+
 }
