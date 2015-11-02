@@ -3,9 +3,7 @@ package org.mskcc.cbio.rxjava.jdbc;
 
         import java.sql.Connection;
         import java.sql.ResultSet;
-        import java.util.ArrayList;
-        import java.util.List;
-        import java.util.Set;
+        import java.util.*;
         import java.util.concurrent.CountDownLatch;
         import java.util.concurrent.ExecutorService;
         import java.util.concurrent.Executors;
@@ -18,6 +16,7 @@ package org.mskcc.cbio.rxjava.jdbc;
         import org.apache.log4j.Logger;
         import org.mskcc.cbio.rxjava.jdbc.model.Cbio;
         import rx.*;
+        import rx.Observable;
         import rx.functions.Action0;
         import rx.functions.Action1;
         import rx.schedulers.Schedulers;
@@ -44,7 +43,7 @@ public class DataServices {
         }
     }
 
-    public static Observable<Cbio.CancerStudy> getCancerStudiesWrapped() {
+    public static Observable<Cbio.CancerStudy> getCancerStudiesWrapped(){
         return Observable.defer(() -> {
             return Observable.from(getCancerStudyList());
         }).subscribeOn(Schedulers.io());
@@ -92,7 +91,7 @@ public class DataServices {
             }
                 }
 
-        ).subscribeOn(Schedulers.io()).take(1000);
+        ).subscribeOn(Schedulers.io()).take(500);
     }
 
 
@@ -107,30 +106,70 @@ public class DataServices {
         geneSet.add(118424L);
         ExecutorService executor = Executors.newFixedThreadPool(10);
        //Observable<Object> geneticAltObs = DataServices.getGeneticAlterationObs(2,geneSet);
-         Observable<Cbio.GeneticAlteration> geneticAltObs = DataServices.getGeneticAltObs(2,null);
-        final Stopwatch subWatch = Stopwatch.createUnstarted();
+         //Observable<Cbio.GeneticAlteration> geneticAltObs = DataServices.getGeneticAltObs(2,null);
+        final Stopwatch subWatch = Stopwatch.createStarted();
 
-        geneticAltObs.doOnNext(new Action1<Cbio.GeneticAlteration>() {
-            @Override
-            public void call(Cbio.GeneticAlteration geneticAlteration) {
-                Scheduler.Worker worker = Schedulers.from(executor).createWorker();
-                final Subscription schedule = worker.schedule(new Action0() {
-                    @Override
-                    public void call() {
-                        //logger.info(Thread.currentThread().getName()); // display what thread this is running on
-                        logger.info(geneticAlteration.toString());
-                        try {
-                            // complete a compute intensive task here
-                            Thread.sleep(100L);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+        Observable<Cbio.GeneticAlteration> gaObs = getGeneticAltObs(2,null);
 
-                    }
+        gaObs.subscribe(new Subscriber<Cbio.GeneticAlteration>() {
+                            @Override
+                            public void onCompleted() {
+                                logger.info("elapsed time = " + subWatch.stop().elapsed(TimeUnit.SECONDS) + " seconds");
 
-                });
-            }
-        });
+                                latch.countDown();
+                            }
+
+                            @Override
+                            public void onError(Throwable throwable) {
+                                logger.error(throwable.getMessage());
+                            }
+
+                            @Override
+                            public void onNext(Cbio.GeneticAlteration o) {
+                                Scheduler.Worker worker = Schedulers.from(executor).createWorker();
+                                final Subscription schedule = worker.schedule(new Action0() {
+                                    @Override
+                                    public void call() {
+                                        //logger.info(Thread.currentThread().getName()); // display what thread this is running on
+                                        logger.info(o.toString());
+                                        try {
+                                            // complete a compute intensive task here
+                                            Thread.sleep(100L);
+                                        } catch (InterruptedException e) {
+                                            e.printStackTrace();
+                                        }
+
+                                    }
+
+
+                                });
+                            }
+                        });
+
+        /*
+         final CountDownLatch latch = new CountDownLatch(2);
+           Observable<Object>obs = getClinicalAttribtues(provider.get());
+           obs.subscribeOn(Schedulers.io());
+
+           obs.subscribe(new Subscriber<Object>() {
+               @Override
+               public void onCompleted() {
+                   logger.info("FINIS...");
+                   latch.countDown();
+               }
+
+               @Override
+               public void onError(Throwable throwable) {
+                    logger.error(throwable.getMessage());
+               }
+
+               @Override
+               public void onNext(Object o) {
+                    logger.info("Clinical attribute  object:" +o.toString());
+               }
+           });
+         */
+
 
 
         /*
